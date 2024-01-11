@@ -1,0 +1,202 @@
+<html>
+<head>
+    <title>Rock, Paper, Scissors</title>
+</head>
+
+<body>
+
+    <div style="display:none;">
+        <img id="RPS" src="RPS.png" />
+    </div>
+
+    <script>
+
+        let canvas;
+        let SPEED = 4;
+        let WIDTH = 400;
+        let HEIGHT = 400;
+        let NO_ENTITIES = 30;
+        let IMAGE;
+        let entities = [];
+
+        let RPS_PROPS = {
+            0: { x: 0, y: 0, width: 20, height: 26, targetType: 1, name: "rock" },
+            1: { x: 20, y: 4, width: 38, height: 25, targetType: 2, name:  "scissor" }, 
+            2: { x: 59, y: 0, width: 36, height: 36, targetType: 0, name: "paper" }
+        };
+
+        function drawRPS(ctx, type, x, y) {
+            let props = RPS_PROPS[type];
+            ctx.drawImage(IMAGE,
+                props.x,
+                props.y,
+                props.width, props.height,
+                x - props.width / 2,
+                y - props.height / 2,
+                props.width, props.height);
+        }
+
+        function findClosestTarget(idx) {
+            const targetType = RPS_PROPS[entities[idx].type].targetType;
+            const x = entities[idx].x;
+            const y = entities[idx].y;
+
+            let closestDist2 = Infinity;
+            let closest = idx;
+
+            for (let i = 0; i < entities.length; i++) {
+                if (idx === i || entities[i].type !== targetType) {
+                    continue;
+                }
+
+                let ox = entities[i].x;
+                let oy = entities[i].x;
+
+                let dist2 = (ox - x) * (ox - x) + (oy - y) * (oy - y);
+                if (dist2 < closestDist2) {
+                    closestDist2 = dist2;
+                    closest = i;
+                }
+            }
+
+            return closest;
+        }
+
+        function update(idx) {
+
+            let entity = entities[idx];
+
+            let closestTargetIdx = findClosestTarget(idx);
+            
+            if (closestTargetIdx === idx) {// no target available, move in random direction
+                let dir = Math.random() * Math.PI * 2;
+
+                let vx = Math.cos(dir) * SPEED;
+                let vy = Math.sin(dir) * SPEED;
+
+                entity.vx = vx;
+                entity.vy = vy;
+            } else {
+                let target = entities[closestTargetIdx];
+
+                let dx = target.x - entity.x;
+                let dy = target.y - entity.y;
+
+                //normalize direction vector
+                let len = Math.hypot(dx, dy);
+
+                dx /= len;
+                dy /= len;
+
+                entity.vx = dx * SPEED;
+                entity.vy = dy * SPEED;
+            }
+
+            entity.x += entity.vx;
+            entity.y += entity.vy;
+        }
+
+        function collide(idx1, idx2) {
+            if (idx1 === idx2) {
+                return;
+            }
+
+            let entity1 = entities[idx1];
+            let entity2 = entities[idx2];
+
+            if (Math.abs(entity1.x - entity2.x) < Math.max(RPS_PROPS[entity1.type].width, RPS_PROPS[entity2.type].width) / 2
+                && Math.abs(entity1.y - entity2.y) < Math.max(RPS_PROPS[entity1.type].height, RPS_PROPS[entity2.type].height) / 2) {
+
+                if (RPS_PROPS[entity1.type].targetType === entity2.type) {
+                    entity2.type = entity1.type;
+                } else if (RPS_PROPS[entity2.type].targetType === entity1.type) {
+                    entity1.type = entity2.type;
+                }
+            }
+        }
+
+        function animate() {
+            for (let i = 0; i < entities.length; i++) {
+                update(i);
+            }
+
+            for (let i = 0; i < entities.length - 1; i++) {
+                for (let j = i + 1; j < entities.length; j++) {
+                    collide(i, j);
+                }
+            }
+        }
+
+        function isRunning() {
+            for (let i = 0; i < entities.length - 1; i++) {
+                if (entities[i].type !== entities[i + 1].type) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        function sleep(ms) {
+	        return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function init() {
+
+            canvas = document.createElement("canvas");
+            canvas.width = WIDTH;
+            canvas.height = HEIGHT;
+
+            let body = document.querySelector("body");
+            body.appendChild(canvas);
+
+            let ctx = canvas.getContext("2d");
+
+            IMAGE = document.getElementById("RPS");
+
+            for (let i = 0; i < NO_ENTITIES; i++) {
+                entities.push({
+                    type: Math.floor(Math.random() * 3),
+                    x: Math.random() * WIDTH,
+                    y: Math.random() * HEIGHT,
+                    vx: 0, vy: 0
+                });
+            }
+
+            IMAGE.addEventListener("load", (e) => {
+
+                let renderLoop = function() {
+                    ctx.fillStyle = "#fff";
+                    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+                    for (let entity of entities) {
+                        drawRPS(ctx, entity.type, entity.x, entity.y);
+                    }
+
+                    if (isRunning()) {
+                        animate();
+                        sleep(100).then(function() {
+                            window.requestAnimationFrame(renderLoop);
+                        });
+                    } else {
+                        let winner = RPS_PROPS[entities[0].type].name;
+                        let text = winner + " wins!";
+                        ctx.font = "48px serif";
+                        ctx.fillStyle = "#000";
+                        let size = ctx.measureText(text);
+                        ctx.fillText(text, (WIDTH - size.width) / 2, (HEIGHT) / 2);
+                    }
+                }
+
+                renderLoop();
+
+            });
+
+        }
+
+        init();
+
+    </script>
+</body>
+
+</html>
